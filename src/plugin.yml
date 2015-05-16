@@ -3,6 +3,3 @@ main: com.gmail.zahusek.Main
 version: 1.0
 authors: [Zahusek]
 description: Simple Sign Edit
-commands:
-    signgui:
-        description: all
