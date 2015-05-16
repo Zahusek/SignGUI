@@ -1,4 +1,5 @@
-package com.gmail.zahusek.protocol;
+p
+package com.gmail.zahusek.protocols;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,50 +30,36 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.plugin.Plugin;
 
-import com.gmail.zahusek.protocol.Reflection.FieldAccessor;
-import com.gmail.zahusek.protocol.Reflection.MethodInvoker;
+import com.gmail.zahusek.protocols.Reflection.FieldAccessor;
+import com.gmail.zahusek.protocols.Reflection.MethodInvoker;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 
 public class TinyProtocol {
-
+	
+	private List<PacketListener> protocolsListeners = new ArrayList<PacketListener>();
+	
 	public static TinyProtocol tinyprotocol;
 	private static final AtomicInteger ID = new AtomicInteger(0);
 
-	private static final MethodInvoker getPlayerHandle = Reflection.getMethod(
-			"{obc}.entity.CraftPlayer", "getHandle");
-	private static final FieldAccessor<Object> getConnection = Reflection
-			.getField("{nms}.EntityPlayer", "playerConnection", Object.class);
-	private static final FieldAccessor<Object> getManager = Reflection
-			.getField("{nms}.PlayerConnection", "networkManager", Object.class);
-	private static final FieldAccessor<Channel> getChannel = Reflection
-			.getField("{nms}.NetworkManager", Channel.class, 0);
+	private static final MethodInvoker getPlayerHandle = Reflection.getMethod("{obc}.entity.CraftPlayer", "getHandle");
+	private static final FieldAccessor<Object> getConnection = Reflection.getField("{nms}.EntityPlayer", "playerConnection", Object.class);
+	private static final FieldAccessor<Object> getManager = Reflection.getField("{nms}.PlayerConnection", "networkManager", Object.class);
+	private static final FieldAccessor<Channel> getChannel = Reflection.getField("{nms}.NetworkManager", Channel.class, 0);
 
-	private static final Class<Object> minecraftServerClass = Reflection
-			.getUntypedClass("{nms}.MinecraftServer");
-	private static final Class<Object> serverConnectionClass = Reflection
-			.getUntypedClass("{nms}.ServerConnection");
-	private static final FieldAccessor<Object> getMinecraftServer = Reflection
-			.getField("{obc}.CraftServer", minecraftServerClass, 0);
-	private static final FieldAccessor<Object> getServerConnection = Reflection
-			.getField(minecraftServerClass, serverConnectionClass, 0);
-	private static final MethodInvoker getNetworkMarkers = Reflection
-			.getTypedMethod(serverConnectionClass, null, List.class,
-					serverConnectionClass);
+	private static final Class<Object> minecraftServerClass = Reflection.getUntypedClass("{nms}.MinecraftServer");
+	private static final Class<Object> serverConnectionClass = Reflection.getUntypedClass("{nms}.ServerConnection");
+	private static final FieldAccessor<Object> getMinecraftServer = Reflection.getField("{obc}.CraftServer", minecraftServerClass, 0);
+	private static final FieldAccessor<Object> getServerConnection = Reflection.getField(minecraftServerClass, serverConnectionClass, 0);
+	private static final MethodInvoker getNetworkMarkers = Reflection.getTypedMethod(serverConnectionClass, null, List.class, serverConnectionClass);
 
-	private static final Class<?> PACKET_LOGIN_IN_START = Reflection
-			.getMinecraftClass("PacketLoginInStart");
-	private static final FieldAccessor<GameProfile> getGameProfile = Reflection
-			.getField(PACKET_LOGIN_IN_START, GameProfile.class, 0);
+	private static final Class<?> PACKET_LOGIN_IN_START = Reflection.getMinecraftClass("PacketLoginInStart");
+	private static final FieldAccessor<GameProfile> getGameProfile = Reflection.getField(PACKET_LOGIN_IN_START, GameProfile.class, 0);
 
-	private Map<String, Channel> channelLookup = new MapMaker().weakValues()
-			.makeMap();
-
+	private Map<String, Channel> channelLookup = new MapMaker().weakValues().makeMap();
 	private Listener listener;
 
-	private Set<Channel> uninjectedChannels = Collections
-			.newSetFromMap(new MapMaker().weakKeys()
-					.<Channel, Boolean> makeMap());
+	private Set<Channel> uninjectedChannels = Collections.newSetFromMap(new MapMaker().weakKeys().<Channel, Boolean>makeMap());
 
 	private List<Object> networkManagers;
 
@@ -82,8 +69,6 @@ public class TinyProtocol {
 	private ChannelInitializer<Channel> endInitProtocol;
 
 	private String handlerName;
-
-	private List<PacketListener> packetListeners = new ArrayList<PacketListener>();
 
 	protected volatile boolean closed;
 	protected Plugin plugin;
@@ -96,7 +81,6 @@ public class TinyProtocol {
 		registerBukkitEvents();
 		registerChannelHandler();
 		registerPlayers(plugin);
-
 		tinyprotocol = this;
 	}
 
@@ -112,8 +96,7 @@ public class TinyProtocol {
 						}
 					}
 				} catch (Exception e) {
-					plugin.getLogger().log(Level.SEVERE,
-							"Cannot inject incomming channel " + channel, e);
+					plugin.getLogger().log(Level.SEVERE, "Cannot inject incomming channel " + channel, e);
 				}
 			}
 
@@ -129,10 +112,9 @@ public class TinyProtocol {
 		};
 
 		serverChannelHandler = new ChannelInboundHandlerAdapter() {
-
+	
 			@Override
-			public void channelRead(ChannelHandlerContext ctx, Object msg)
-					throws Exception {
+			public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 				Channel channel = (Channel) msg;
 
 				channel.pipeline().addFirst(beginInitProtocol);
@@ -175,14 +157,11 @@ public class TinyProtocol {
 		Object serverConnection = getServerConnection.get(mcServer);
 		boolean looking = true;
 
-		networkManagers = (List<Object>) getNetworkMarkers.invoke(null,
-				serverConnection);
+		networkManagers = (List<Object>) getNetworkMarkers.invoke(null, serverConnection);
 		createServerChannelHandler();
 
 		for (int i = 0; looking; i++) {
-			List<Object> list = Reflection.getField(
-					serverConnection.getClass(), List.class, i).get(
-					serverConnection);
+			List<Object> list = Reflection.getField(serverConnection.getClass(), List.class, i).get(serverConnection);
 
 			for (Object item : list) {
 				if (!ChannelFuture.class.isInstance(item))
@@ -204,7 +183,6 @@ public class TinyProtocol {
 		for (Channel serverChannel : serverChannels) {
 			final ChannelPipeline pipeline = serverChannel.pipeline();
 
-			// Remove channel handler
 			serverChannel.eventLoop().execute(new Runnable() {
 
 				@Override
@@ -212,7 +190,6 @@ public class TinyProtocol {
 					try {
 						pipeline.remove(serverChannelHandler);
 					} catch (NoSuchElementException e) {
-						// That's fine
 					}
 				}
 
@@ -225,44 +202,34 @@ public class TinyProtocol {
 			injectPlayer(player);
 		}
 	}
-
 	public void sendPacket(Player player, Object packet) {
 		sendPacket(getChannel(player), packet);
 	}
-
 	public void sendPacket(Channel channel, Object packet) {
 		channel.pipeline().writeAndFlush(packet);
 	}
-
 	public void receivePacket(Player player, Object packet) {
 		receivePacket(getChannel(player), packet);
 	}
-
 	public void receivePacket(Channel channel, Object packet) {
 		channel.pipeline().context("encoder").fireChannelRead(packet);
 	}
-
 	protected String getHandlerName() {
 		return "tiny-" + plugin.getName() + "-" + ID.incrementAndGet();
 	}
-
 	public void injectPlayer(Player player) {
 		injectChannelInternal(getChannel(player)).player = player;
 	}
-
 	public void injectChannel(Channel channel) {
 		injectChannelInternal(channel);
 	}
-
 	private PacketInterceptor injectChannelInternal(Channel channel) {
 		try {
-			PacketInterceptor interceptor = (PacketInterceptor) channel
-					.pipeline().get(handlerName);
+			PacketInterceptor interceptor = (PacketInterceptor) channel.pipeline().get(handlerName);
 
 			if (interceptor == null) {
 				interceptor = new PacketInterceptor();
-				channel.pipeline().addBefore("packet_handler", handlerName,
-						interceptor);
+				channel.pipeline().addBefore("packet_handler", handlerName, interceptor);
 				uninjectedChannels.remove(channel);
 			}
 
@@ -271,26 +238,21 @@ public class TinyProtocol {
 			return (PacketInterceptor) channel.pipeline().get(handlerName);
 		}
 	}
-
 	public Channel getChannel(Player player) {
 		Channel channel = channelLookup.get(player.getName());
 
 		if (channel == null) {
-			Object connection = getConnection.get(getPlayerHandle
-					.invoke(player));
+			Object connection = getConnection.get(getPlayerHandle.invoke(player));
 			Object manager = getManager.get(connection);
 
-			channelLookup.put(player.getName(),
-					channel = getChannel.get(manager));
+			channelLookup.put(player.getName(), channel = getChannel.get(manager));
 		}
 
 		return channel;
 	}
-
 	public void uninjectPlayer(Player player) {
 		uninjectChannel(getChannel(player));
 	}
-
 	public void uninjectChannel(final Channel channel) {
 		if (!closed) {
 			uninjectedChannels.add(channel);
@@ -305,25 +267,20 @@ public class TinyProtocol {
 
 		});
 	}
-
 	public boolean hasInjected(Player player) {
 		return hasInjected(getChannel(player));
 	}
-
 	public boolean hasInjected(Channel channel) {
 		return channel.pipeline().get(handlerName) != null;
 	}
-
 	public final void close() {
 		if (!closed) {
 			closed = true;
 
-			// Remove our handlers
 			for (Player player : plugin.getServer().getOnlinePlayers()) {
 				uninjectPlayer(player);
 			}
 
-			// Clean up Bukkit
 			HandlerList.unregisterAll(listener);
 			unregisterChannelHandler();
 		}
@@ -333,18 +290,15 @@ public class TinyProtocol {
 		public volatile Player player;
 
 		@Override
-		public void channelRead(ChannelHandlerContext ctx, Object msg)
-				throws Exception {
+		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 			final Channel channel = ctx.channel();
 			handleLoginStart(channel, msg);
 
 			try {
-				for (PacketListener listener : packetListeners) {
-					msg = listener.onPacketInAsync(player, channel, msg);
-				}
+				for(PacketListener pl : protocolsListeners)
+				msg = pl.onPacketInAsync(player, channel, msg);
 			} catch (Exception e) {
-				plugin.getLogger().log(Level.SEVERE,
-						"Error in onPacketInAsync().", e);
+				plugin.getLogger().log(Level.SEVERE, "Error in onPacketInAsync().", e);
 			}
 
 			if (msg != null) {
@@ -353,15 +307,12 @@ public class TinyProtocol {
 		}
 
 		@Override
-		public void write(ChannelHandlerContext ctx, Object msg,
-				ChannelPromise promise) throws Exception {
+		public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
 			try {
-				for (PacketListener listener : packetListeners) {
-					msg = listener.onPacketOutAsync(player, ctx.channel(), msg);
-				}
+				for(PacketListener pl : protocolsListeners)
+				msg = pl.onPacketOutAsync(player, ctx.channel(), msg);
 			} catch (Exception e) {
-				plugin.getLogger().log(Level.SEVERE,
-						"Error in onPacketOutAsync().", e);
+				plugin.getLogger().log(Level.SEVERE, "Error in onPacketOutAsync().", e);
 			}
 
 			if (msg != null) {
@@ -376,30 +327,24 @@ public class TinyProtocol {
 			}
 		}
 	}
-
-	public Plugin getPlugin() {
-		return this.plugin;
-	}
-
-	public void registerListener(PacketListener listener) {
-		this.packetListeners.add(listener);
-	}
-
-	public void unregisterListener(PacketListener listener) {
-		this.packetListeners.remove(listener);
-	}
-
 	public static TinyProtocol getTinyProtocol() {
 		return tinyprotocol;
 	}
+	public void registerListener(PacketListener listener) {
+		this.protocolsListeners.add(listener);
+	}
+	public static abstract class PacketListener {
+		
+		public PacketListener(){
+			TinyProtocol.getTinyProtocol().registerListener(this);
+		}
 
-	public interface PacketListener {
+		public Object onPacketOutAsync(Player reciever, Channel channel, Object packet){
+			return packet;
+		}
 
-		public Object onPacketOutAsync(Player reciever, Channel channel,
-				Object packet);
-
-		public Object onPacketInAsync(Player sender, Channel channel,
-				Object packet);
-
+		public Object onPacketInAsync(Player sender, Channel channel, Object packet){
+			return packet;
+		}
 	}
 }
